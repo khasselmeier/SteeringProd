@@ -7,62 +7,70 @@ public class Align : SteeringBehavior
     public Kinematic character;
     public GameObject target;
 
-    float maxAngularAcceleration = 100f; // 5
-    float maxRotation = 45f; // maxAngularVelocity
+    float maxAngularAcceleration = 1000f;
+    float maxRotation = 360f; // maxAngularVelocity
 
-    // the radius for arriving at the target
-    //float targetRadius = 1f;
+    // The radius for arriving at the target
+    float targetRadius = 1f;
 
-    // the radius for beginning to slow down
+    // The radius for beginning to slow down
     float slowRadius = 10f;
 
-    // the time over which to achieve target speed
-    float timeToTarget = 0.1f;
+    // The time over which to achieve target speed
+    float timeToTarget = 0.05f;
 
-    // returns the angle in degrees that we want to align with
-    // Align will rotate to match the target's oriention
-    // sub-classes can overwrite this function to set a different target angle e.g. to face a target
+    // Returns the angle in degrees that we want to align with
     public virtual float getTargetAngle()
     {
-        return target.transform.eulerAngles.y;
+        // Use the direction of movement (velocity) to determine the target angle
+        Vector3 velocity = character.linearVelocity;
+        if (velocity.magnitude == 0) // If velocity is zero, use the current orientation
+        {
+            return character.transform.eulerAngles.y;
+        }
+
+        // Otherwise calculate the angle based on velocity direction
+        float targetAngle = Mathf.Atan2(velocity.x, velocity.z) * Mathf.Rad2Deg;
+        return targetAngle; // return the calculated angle directly
     }
 
     public override SteeringOutput getSteering()
     {
         SteeringOutput result = new SteeringOutput();
 
-        // get the naive direction to the target
-        //float rotation = Mathf.DeltaAngle(character.transform.eulerAngles.y, target.transform.eulerAngles.y);
+        // Get the naive direction to the target (velocity-based target angle)
         float rotation = Mathf.DeltaAngle(character.transform.eulerAngles.y, getTargetAngle());
         float rotationSize = Mathf.Abs(rotation);
 
-        // check if we are there, return no steering
-        //if (rotationSize < targetRadius)
-        //{
-        //    return null;
-        //}
+        // Get the current angular velocity
+        float currentAngularVelocity = float.IsNaN(character.angularVelocity) ? 0f : character.angularVelocity;
 
-        // if we are outside the slow radius, then use maximum rotation
+        // If we are within the target radius, stop rotating
+        if (rotationSize < targetRadius)
+        {
+            result.angular = -currentAngularVelocity; // Smoothly reduce angular velocity to zero
+            return result;
+        }
+
+        // If we are outside the slow radius, use the maximum rotation speed
         float targetRotation = 0.0f;
         if (rotationSize > slowRadius)
         {
             targetRotation = maxRotation;
         }
-        else // otherwise use a scaled rotation
+        else // Otherwise use a scaled rotation
         {
             targetRotation = maxRotation * rotationSize / slowRadius;
         }
 
-        // the final targetRotation combines speed (already in the variable) and direction
+        // The final targetRotation combines speed and direction
         targetRotation *= rotation / rotationSize;
 
-        // acceleration tries to get to the target rotation
-        // something is breaking my angularVelocty... check if NaN and use 0 if so
-        float currentAngularVelocity = float.IsNaN(character.angularVelocity) ? 0f : character.angularVelocity;
-        result.angular = targetRotation - currentAngularVelocity;
+        // Apply damping to smooth out the rotation
+        result.angular = (targetRotation - currentAngularVelocity) * 1.0f;
         result.angular /= timeToTarget;
 
-        // check if the acceleration is too great
+        // Check if the angular acceleration is too great
         float angularAcceleration = Mathf.Abs(result.angular);
         if (angularAcceleration > maxAngularAcceleration)
         {

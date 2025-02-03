@@ -7,7 +7,7 @@ public class PathFollower : Kinematic
     FollowPath myMoveType;
     LookWhereGoing myRotateType;
 
-    public GameObject[] myPath = new GameObject[4];
+    public GameObject[] myPath = new GameObject[1];
 
     void Start()
     {
